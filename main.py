@@ -1,70 +1,82 @@
 import os
 from PIL import Image
 
+class ImageCollageCreator:
+    def __init__(self, folder_name, padding=70, border_size=100, border_color=(255, 255, 255)):
+        self.folder_name = folder_name
+        self.padding = padding
+        self.border_size = border_size
+        self.border_color = border_color
 
-def merge_images_from_folder(folder_name, output_file):
-    images = []
-    for filename in os.listdir(folder_name):
-        if filename.endswith(".png"):
-            img = Image.open(os.path.join(folder_name, filename))
-            images.append(img)
-            print(f"Обработан файл: {filename}")
+    def merge_images_from_folder(self, folder_name):
+        images = []
+        for filename in os.listdir(folder_name):
+            if filename.endswith(".png"):
+                img = Image.open(os.path.join(folder_name, filename))
+                images.append(img)
+                print(f"Обработан файл: {filename}")
 
-    if not images:
-        print("Нет изображений для объединения")
-        return
+        if not images:
+            print("Нет изображений для объединения")
+            return None
 
-    try:
-        images[0].save(output_file, save_all=True, append_images=images[1:])
-        print(f"Изображения успешно объединены в файл {output_file}")
-        return images  # Возвращаем список изображений
-    except Exception as e:
-        print(f"Ошибка при объединении изображений: {e}")
-        return None
+        return images
 
+    def create_collage(self, images, output_file):
+        """
+        Создает коллаж из списка изображений и сохраняет его в файл.
 
-def create_collage(images, output_file, collage_size=(800, 800)):
-    """
-    Создает коллаж из списка изображений и сохраняет его в файл.
+        :param images: Список объектов изображений PIL.Image
+        :param output_file: Путь для сохранения коллажа
+        """
+        # Определяем количество изображений
+        num_images = len(images)
 
-    :param images: Список объектов изображений PIL.Image
-    :param output_file: Путь для сохранения коллажа
-    :param collage_size: Размеры коллажа (ширина, высота)
-    """
-    # Определяем количество изображений
-    num_images = len(images)
+        # Рассчитываем количество столбцов и строк в коллаже
+        num_rows = 2  # Две строки
+        num_cols = (num_images + num_rows - 1) // num_rows
 
-    # Вычисляем количество столбцов и строк в коллаже
-    num_cols = int(num_images ** 0.5)
-    num_rows = (num_images + num_cols - 1) // num_cols
+        # Вычисляем общий размер коллажа
+        collage_width = max(img.width for img in images) * num_cols + (num_cols - 1) * self.padding + 5 * self.border_size
+        collage_height = max(img.height for img in images) * num_rows + (num_rows - 1) * self.padding + 5 * self.border_size
 
-    # Создаем пустое изображение для коллажа
-    collage = Image.new('RGB', collage_size, (255, 255, 255))
+        # Создаем пустое изображение для коллажа
+        collage = Image.new('RGB', (collage_width, collage_height), (255, 255, 255))
 
-    # Рассчитываем размер каждого мини-изображения в коллаже
-    mini_image_width = collage_size[0] // num_cols
-    mini_image_height = collage_size[1] // num_rows
+        # Добавляем изображения в коллаж
+        for i, img in enumerate(images):
+            col = i % num_cols
+            row = i // num_cols
 
-    # Ресайзим и добавляем каждое изображение в коллаж
-    for i, img in enumerate(images):
-        resized_img = img.resize((mini_image_width, mini_image_height), Image.LANCZOS)
-        collage.paste(resized_img, (i % num_cols * mini_image_width, i // num_cols * mini_image_height))
+            x = col * (img.width + self.padding) + self.border_size
+            y = row * (img.height + self.padding) + self.border_size
 
-    # Сохраняем коллаж
-    collage.save(output_file)
-    print(f"Коллаж успешно сохранен в файле: {output_file}")
+            # Создаем рамку вокруг изображения
+            bordered_img = Image.new('RGB', (img.width + 2 * self.border_size, img.height + 2 * self.border_size), self.border_color)
+            bordered_img.paste(img, (self.border_size, self.border_size))
+
+            collage.paste(bordered_img, (x, y))
+
+        # Сохраняем коллаж
+        collage.save(output_file)
+        print(f"Коллаж успешно сохранен в файле: {output_file}")
+
+    def process_folders(self):
+        for folder in os.listdir(self.folder_name):
+            folder_path = os.path.join(self.folder_name, folder)
+            if os.path.isdir(folder_path):
+                result_folder = os.path.join(folder_path, f"{folder}_results")
+                if not os.path.exists(result_folder):
+                    os.makedirs(result_folder)  # Создаем папку, если ее нет
+                images = self.merge_images_from_folder(folder_path)
+                if images:
+                    result_file = os.path.join(result_folder, "result.tif")
+                    self.create_collage(images, result_file)
 
 
 # Папка с изображениями (используем относительный путь)
-folder_name = 'image_pack/1369_12_Наклейки 3-D_3'
+folder_name = 'image_pack'
 
-# Выходной файл
-output_file = 'Result.tif'
-
-# Объединяем изображения
-images = merge_images_from_folder(folder_name, output_file)
-
-# Проверяем, что изображения были успешно объединены
-if images:
-    # Создаем коллаж
-    create_collage(images, "result2.tif")
+# Создаем экземпляр класса и выполняем объединение и создание коллажей для всех папок внутри image_pack
+collage_creator = ImageCollageCreator(folder_name)
+collage_creator.process_folders()
